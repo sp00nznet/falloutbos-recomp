@@ -170,7 +170,7 @@ Found by this port, each on its own branch in xboxrecomp:
 
 | Branch | What |
 |---|---|
-| `fix/disasm-tables-in-code-sections` | function-pointer tables inside XDK code sections (D3D's render-state handlers) |
+| `fix/disasm-tables-in-code-sections` ([#227](https://github.com/sp00nznet/xboxrecomp/pull/227)) | function-pointer tables inside XDK code sections (D3D's render-state handlers) |
 | `fix/io-apc-delivery` ([#226](https://github.com/sp00nznet/xboxrecomp/pull/226)) | file I/O APC: restore esp after delivery; opt-in delivery at the next alertable wait |
 | community PR #186 | `pushfd`/`popfd`/`cpuid` lifted as the hardware does them. Until it lands, `recomp_manual.c` overrides the one function that needs it |
 

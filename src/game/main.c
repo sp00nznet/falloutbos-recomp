@@ -157,7 +157,7 @@ typedef struct { char name[112]; unsigned n; } prof_ent;
 static prof_ent g_prof[2048];
 static unsigned g_prof_used, g_prof_total;
 
-static void prof_count(DWORD tid, DWORD64 rip)
+static void prof_count(DWORD tid, DWORD64 rip, unsigned weight)
 {
     char buf[sizeof(SYMBOL_INFO) + 96];
     SYMBOL_INFO *sym = (SYMBOL_INFO *)buf;
@@ -188,12 +188,28 @@ static void prof_count(DWORD tid, DWORD64 rip)
         snprintf(key, sizeof(key), "%5lu %s", (unsigned long)tid, name);
         name = key;
     }
-    g_prof_total++;
+    g_prof_total += weight;
     for (i = 0; i < g_prof_used; i++)
-        if (!strcmp(g_prof[i].name, name)) { g_prof[i].n++; return; }
+        if (!strcmp(g_prof[i].name, name)) { g_prof[i].n += weight; return; }
     if (g_prof_used < 2048) {
         strncpy(g_prof[g_prof_used].name, name, 111);
-        g_prof[g_prof_used++].n = 1;
+        g_prof[g_prof_used++].n = weight;
+    }
+}
+
+/* Raw samples, named only at the end: a PDB lookup per sample held the
+ * rate to ~5 Hz per thread. ponytail: open addressing, drops when full. */
+typedef struct { DWORD64 rip; DWORD tid; unsigned n; } prof_raw;
+static prof_raw g_raw[1 << 16];
+
+static void prof_sample(DWORD tid, DWORD64 rip)
+{
+    unsigned h = (unsigned)((rip ^ (rip >> 17) ^ tid) * 2654435761u) >> 16, k;
+    for (k = 0; k < 64; k++, h = (h + 1) & 0xFFFF) {
+        if (g_raw[h].n && (g_raw[h].rip != rip || g_raw[h].tid != tid))
+            continue;
+        g_raw[h].rip = rip; g_raw[h].tid = tid; g_raw[h].n++;
+        return;
     }
 }
 
@@ -214,35 +230,54 @@ static DWORD WINAPI profiler(LPVOID arg)
     fprintf(stderr, "[PROF] sampling for %us\n", secs);
     timeBeginPeriod(1);
     t0 = GetTickCount();
-    while (GetTickCount() - t0 < secs * 1000u) {
-        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-        THREADENTRY32 te;
-        te.dwSize = sizeof(te);
-        if (snap != INVALID_HANDLE_VALUE && Thread32First(snap, &te)) {
-            do {
-                HANDLE th;
+    {
+        /* The snapshot lists every thread on the system and is slow, so the
+         * thread list is refreshed once a second, not per sample. */
+        HANDLE th[64];
+        DWORD tid[64], refreshed = 0;
+        unsigned nth = 0, k;
+        while (GetTickCount() - t0 < secs * 1000u) {
+            if (!refreshed || GetTickCount() - refreshed > 1000) {
+                HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+                THREADENTRY32 te;
+                for (k = 0; k < nth; k++)
+                    CloseHandle(th[k]);
+                nth = 0;
+                te.dwSize = sizeof(te);
+                if (snap != INVALID_HANDLE_VALUE && Thread32First(snap, &te)) {
+                    do {
+                        if (te.th32OwnerProcessID != pid || te.th32ThreadID == me
+                            || nth == 64)
+                            continue;
+                        th[nth] = OpenThread(THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME,
+                                             FALSE, te.th32ThreadID);
+                        if (th[nth])
+                            tid[nth++] = te.th32ThreadID;
+                    } while (Thread32Next(snap, &te));
+                }
+                if (snap != INVALID_HANDLE_VALUE)
+                    CloseHandle(snap);
+                refreshed = GetTickCount();
+            }
+            for (k = 0; k < nth; k++) {
                 /* x64 GetThreadContext fails on a CONTEXT that is not
                  * 16-byte aligned, and a stack local is not guaranteed to be. */
                 __declspec(align(16)) CONTEXT ctx;
-                if (te.th32OwnerProcessID != pid || te.th32ThreadID == me)
-                    continue;
-                th = OpenThread(THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME,
-                                FALSE, te.th32ThreadID);
-                if (!th)
-                    continue;
                 ctx.ContextFlags = CONTEXT_CONTROL;
-                if (SuspendThread(th) != (DWORD)-1) {
-                    if (GetThreadContext(th, &ctx))
-                        prof_count(te.th32ThreadID, ctx.Rip);
-                    ResumeThread(th);
+                if (SuspendThread(th[k]) != (DWORD)-1) {
+                    if (GetThreadContext(th[k], &ctx))
+                        prof_sample(tid[k], ctx.Rip);
+                    ResumeThread(th[k]);
                 }
-                CloseHandle(th);
-            } while (Thread32Next(snap, &te));
+            }
+            Sleep(1);
         }
-        if (snap != INVALID_HANDLE_VALUE)
-            CloseHandle(snap);
-        Sleep(2);
+        for (k = 0; k < nth; k++)
+            CloseHandle(th[k]);
     }
+    for (i = 0; i < (1u << 16); i++)
+        if (g_raw[i].n)
+            prof_count(g_raw[i].tid, g_raw[i].rip, g_raw[i].n);
     qsort(g_prof, g_prof_used, sizeof(g_prof[0]), prof_cmp);
     fprintf(stderr, "[PROF] %u samples, top functions:\n", g_prof_total);
     for (i = 0; i < g_prof_used && i < 60; i++)

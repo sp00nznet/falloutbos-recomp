@@ -22,7 +22,10 @@
 set -uo pipefail
 
 FBOS="$(cd "$(dirname "$0")" && pwd)"
-RECOMP="${RECOMP:-$FBOS/../xboxrecomp}"
+# Setup.cmd puts the toolkit in deps/xboxrecomp; a side-by-side checkout works too.
+if [[ -z "${RECOMP:-}" ]]; then
+    if [[ -d "$FBOS/deps/xboxrecomp" ]]; then RECOMP="$FBOS/deps/xboxrecomp"; else RECOMP="$FBOS/../xboxrecomp"; fi
+fi
 XBE="$FBOS/game/default.xbe"
 PY="${PY:-py -3}"
 

@@ -52,74 +52,77 @@ What it took, and why, is in [docs/boot.md](docs/boot.md).
 
 ## Getting Started
 
-> A one-click `Setup.cmd` (REPO_RULES section 5's Quick start) is not written
-> yet; see [ROADMAP.md](ROADMAP.md). Until then this is the technical route.
+You need your own **Fallout: Brotherhood of Steel (USA)** disc image (`.iso`).
+Nothing from the game is downloaded or included.
 
-### Prerequisites
+### Quick start
 
-- Windows 10/11, x64
-- Visual Studio 2022 with the C/C++ desktop workload, or clang-cl
-- CMake 3.20+
-- Python 3.10+ with `capstone` (`py -3 -m pip install capstone`). Use `py -3`,
-  not `python`: the Microsoft Store alias for `python` is not a real install.
-- Git
-- Your own **Fallout: Brotherhood of Steel (USA)** disc image (`.iso`)
+1. Download this repo (Code → Download ZIP, or clone it) and unpack it.
+2. Double-click **`Setup.cmd`**. It checks for Python, Git, CMake and the
+   Visual Studio C++ build tools, and **asks before installing** anything
+   missing (with what, why and how big). It finds your disc image or asks for
+   it, then unpacks it, generates the C, and builds. Expect 10-20 minutes the
+   first time, most of it the build. If it stops, it says why in one sentence
+   and keeps the details in `setup.log`; running it again resumes.
+3. Double-click **`Play.cmd`**. An XInput controller (Xbox 360/One pad) is
+   player 1; the keyboard works too: WASD left stick, IJKL right stick,
+   Z/X/C/V = A/B/X/Y, Enter = Start, Backspace = Back, 1/3 = triggers.
 
 ### Step by step
 
-1. Clone this repo and the toolkit side by side, so the toolkit is `../xboxrecomp`:
+These are the commands `Setup.cmd` runs.
+
+Prerequisites: Windows 10/11 x64; Python 3.10+ with `capstone`
+(`py -3 -m pip install capstone`); Git for Windows (it provides `bash`);
+CMake 3.20+; Visual Studio 2022 or its Build Tools with the C++ workload.
+Use `py -3`, not `python`: the Microsoft Store alias for `python` is not a real
+install. After installing anything, open a new terminal so PATH picks it up.
+
+1. Get this repo and the toolkit. The port needs toolkit changes still in
+   review (see [Toolkit changes](#toolkit-changes)); `work/falloutbos` has them
+   all:
 
    ```bash
    git clone https://github.com/sp00nznet/falloutbos-recomp falloutbos
-   git clone https://github.com/sp00nznet/xboxrecomp xboxrecomp
+   cd falloutbos
+   git clone --branch work/falloutbos https://github.com/sp00nznet/xboxrecomp deps/xboxrecomp
    ```
-
-   This port currently needs three toolkit changes that are not merged yet
-   (see [Toolkit changes](#toolkit-changes)). Check out a toolkit branch that
-   has them.
 
 2. Unpack your disc into `game/`:
 
    ```bash
-   cd xboxrecomp
-   py -3 -m tools.xiso unpack "/path/to/Fallout - Brotherhood of Steel (USA).iso" -o ../falloutbos/game
+   (cd deps/xboxrecomp && py -3 -m tools.xiso unpack "/path/to/Fallout - Brotherhood of Steel (USA).iso" -o ../../game)
    ```
 
-   Expected: `extracted 491 files to ../falloutbos/game`.
+   Expected: `extracted 491 files to ../../game`.
 
 3. Generate the C (about 3 minutes, most of it the disassembler):
 
    ```bash
-   cd ../falloutbos
-   ./regen.sh --disasm
+   RECOMP=deps/xboxrecomp ./regen.sh --disasm
    ```
 
    Expected, at the end:
 
    ```
-   3888/3888 functions (0 failed), 543045 lines of C, 8 source files
+   3888/3889 functions (0 failed), 543025 lines of C, 8 source files
    1 unresolved call targets stubbed (addresses called but not detected as functions)
    ```
 
 4. Build:
 
    ```bash
-   cmake -S . -B build-msvc -A x64
+   cmake -S . -B build-msvc -A x64 -DXBOXRECOMP_DIR=deps/xboxrecomp
    cmake --build build-msvc --config Release
    ```
 
    The executable lands in `bin/fbos.exe`.
 
-5. Run from the repo root (it reads `game/default.xbe`):
+5. Run from the repo root (it reads `game/default.xbe`), or use `Play.cmd`:
 
    ```bash
-   RECOMP_PB_EXEC=1 RECOMP_FB_WINDOW=1 ./bin/fbos.exe
+   RECOMP_PB_EXEC=1 RECOMP_FB_WINDOW=1 RECOMP_KEYBOARD=1 ./bin/fbos.exe
    ```
-
-   An XInput controller (Xbox 360/One pad) plugged into the PC is player 1.
-   Without one, add `RECOMP_KEYBOARD=1`: WASD left stick, IJKL right stick,
-   Z/X/C/V = A/B/X/Y, Enter = Start, Backspace = Back, 1/3 = triggers. Keys are
-   read from the game window while it has focus.
 
 ## Usage
 

@@ -30,3 +30,5 @@ scratch/
 
 __pycache__/
 *.pyc
+deps/
+setup.log

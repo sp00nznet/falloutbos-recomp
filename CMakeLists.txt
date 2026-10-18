@@ -48,7 +48,13 @@ endif()
 
 # ── xboxrecomp runtime libraries ──────────────────────────
 # Point this to your xboxrecomp checkout
-set(XBOXRECOMP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../xboxrecomp" CACHE PATH "Path to xboxrecomp toolkit")
+# Setup.cmd puts the toolkit in deps/xboxrecomp; a side-by-side checkout works too.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/xboxrecomp/CMakeLists.txt")
+    set(_fbos_toolkit "${CMAKE_CURRENT_SOURCE_DIR}/deps/xboxrecomp")
+else()
+    set(_fbos_toolkit "${CMAKE_CURRENT_SOURCE_DIR}/../xboxrecomp")
+endif()
+set(XBOXRECOMP_DIR "${_fbos_toolkit}" CACHE PATH "Path to xboxrecomp toolkit")
 add_subdirectory(${XBOXRECOMP_DIR} ${CMAKE_BINARY_DIR}/xboxrecomp)
 
 # ── Recompiled game executable ─────────────────────────────

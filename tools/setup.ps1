@@ -1,0 +1,87 @@
+# Quick start for falloutbos-recomp: from a plain download to a playable build.
+# Run by Setup.cmd. Every step below is the same command README's
+# "Step by step" documents, so the two routes cannot drift apart.
+#
+# - Checks prerequisites and ASKS before installing anything (winget).
+# - Asks for your own disc image, finding it first when it can.
+# - Skips steps already done, so a rerun after a failure resumes.
+# - On failure, one sentence on what to do; details in setup.log.
+#
+# Nothing here downloads or bundles game data: you supply the disc.
+
+$ErrorActionPreference = 'Stop'
+$Root    = Split-Path -Parent $PSScriptRoot
+$Log     = Join-Path $Root 'setup.log'
+$Toolkit = Join-Path $Root 'deps\xboxrecomp'
+# The toolkit branch with this port's fixes; main once xboxrecomp #226-#228 merge.
+$ToolkitRef = 'work/falloutbos'
+Set-Location $Root
+"=== setup $(Get-Date -Format s) ===" | Out-File $Log -Append -Encoding utf8
+
+function Say($m)  { Write-Host $m; $m | Out-File $Log -Append -Encoding utf8 }
+function Fail($m) { Write-Host ""; Write-Host "Setup stopped: $m" -ForegroundColor Red
+                    Write-Host "Details are in $Log"; Read-Host "Press Enter to close"; exit 1 }
+function Ask($q)  { (Read-Host "$q [y/N]") -match '^[Yy]' }
+function Run($what, [scriptblock]$cmd) {
+    Say "--> $what"
+    & $cmd *>> $Log
+    if ($LASTEXITCODE -ne 0) { Fail "$what failed." }
+}
+function Have($exe) { [bool](Get-Command $exe -ErrorAction SilentlyContinue) }
+function Install($id, $why, $size) {
+    if (-not (Have 'winget')) { Fail "$why is missing and winget is not available; install it by hand (see README)." }
+    if (-not (Ask "$why is not installed. Install $id with winget (about $size)?")) { Fail "$why is required." }
+    Run "installing $id" { winget install --id $id -e --accept-package-agreements --accept-source-agreements }
+    Say "Installed. If the next check still fails, close this window and run Setup.cmd again (PATH changes need a new window)."
+}
+
+# ---- 1. prerequisites --------------------------------------------------------
+Say "Checking prerequisites..."
+if (-not (Have 'py')) { Install 'Python.Python.3.12' 'Python 3' '30 MB' }
+if (-not (Have 'py')) { Fail "Python is installed but 'py' is not on PATH yet; open a new window and run Setup.cmd again." }
+& py -3 -c "import capstone" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    if (-not (Ask "The Python package 'capstone' (disassembler, about 3 MB) is missing. Install it with pip?")) { Fail "capstone is required." }
+    Run 'pip install capstone' { py -3 -m pip install --user capstone }
+}
+if (-not (Have 'git')) { Install 'Git.Git' 'Git (also provides bash)' '60 MB' }
+if (-not (Have 'cmake')) { Install 'Kitware.CMake' 'CMake' '40 MB' }
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$vc = if (Test-Path $vswhere) { & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath } else { $null }
+if (-not $vc) {
+    if (-not (Ask "The Visual Studio 2022 C++ build tools are not installed. Install them with winget (about 6 GB)?")) { Fail "a C compiler is required." }
+    Run 'installing VS 2022 Build Tools' { winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-package-agreements --accept-source-agreements --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" }
+}
+$bash = Join-Path (Split-Path (Split-Path (Get-Command git).Source)) 'bin\bash.exe'
+if (-not (Test-Path $bash)) { Fail "Git's bash.exe was not found next to git; reinstall Git for Windows." }
+
+# ---- 2. toolkit ----------------------------------------------------------------
+if (-not (Test-Path (Join-Path $Toolkit '.git'))) {
+    Run "fetching the xboxrecomp toolkit ($ToolkitRef)" { git clone --branch $ToolkitRef https://github.com/sp00nznet/xboxrecomp $Toolkit }
+} else { Say "Toolkit already present: $Toolkit" }
+
+# ---- 3. your disc --------------------------------------------------------------
+if (-not (Test-Path (Join-Path $Root 'game\default.xbe'))) {
+    $iso = Get-ChildItem -Path $Root, "$env:USERPROFILE\Downloads" -Filter '*.iso' -ErrorAction SilentlyContinue |
+           Where-Object { $_.Name -match 'Fallout' -and $_.Name -match 'Brotherhood' } | Select-Object -First 1
+    if ($iso -and (Ask "Use this disc image: $($iso.FullName)?")) { $path = $iso.FullName }
+    else { $path = (Read-Host "Path to your Fallout: Brotherhood of Steel (USA) .iso").Trim('"') }
+    if (-not (Test-Path $path)) { Fail "no disc image at '$path'." }
+    Run 'unpacking your disc into game\' { Push-Location $Toolkit; py -3 -m tools.xiso unpack $path -o (Join-Path $Root 'game'); $c = $LASTEXITCODE; Pop-Location; $global:LASTEXITCODE = $c }
+} else { Say "Disc already unpacked into game\" }
+
+# ---- 4. generate the C ---------------------------------------------------------
+if (-not (Test-Path (Join-Path $Root 'src\game\recomp\gen\recomp_funcs.h'))) {
+    $env:RECOMP = $Toolkit
+    Run 'generating C from your disc (about 3 minutes)' { & $bash ./regen.sh --disasm }
+} else { Say "Generated C already present (delete src\game\recomp\gen to redo)" }
+
+# ---- 5. build ------------------------------------------------------------------
+if (-not (Test-Path (Join-Path $Root 'bin\fbos.exe'))) {
+    Run 'configuring the build' { cmake -S . -B build-msvc -A x64 "-DXBOXRECOMP_DIR=$Toolkit" }
+    Run 'building (several minutes; your machine will be busy)' { cmake --build build-msvc --config Release }
+} else { Say "Already built: bin\fbos.exe" }
+
+Say ""
+Say "Done. Double-click Play.cmd in $Root to start the game."
+Read-Host "Press Enter to close"

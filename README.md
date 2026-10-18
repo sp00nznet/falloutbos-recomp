@@ -50,6 +50,17 @@ pushbuffer drew into. The level shot was reached headless with a scripted pad.*
 
 What it took, and why, is in [docs/boot.md](docs/boot.md).
 
+### Conformance
+
+| Check | Result | Command |
+|---|---|---|
+| Boot milestones, Interplay logo to Carbon, scripted pad | **8/8** | `py -3 tools/boot_check.py` |
+| The title's own functions, native vs lifted (xboxrecomp `--xbe`, with #229) | 269 vectors, **3 mismatches** (x87 exception flags; one scratch overrun) | `(cd deps/xboxrecomp && py -3 -m tools.conformance --only corpus --xbe ../../game/default.xbe --xbe-limit 400)` |
+
+`boot_check` fails only on a regression against `config/boot_check_baseline.json`,
+and prints SKIP on a machine without game data. It is the netlab QA step
+(`netlab check falloutbos-recomp`).
+
 ## Getting Started
 
 You need your own **Fallout: Brotherhood of Steel (USA)** disc image (`.iso`).
@@ -175,6 +186,7 @@ Found by this port, each on its own branch in xboxrecomp:
 
 | Branch | What |
 |---|---|
+| `fix/conformance-xbe-unimpl` ([#229](https://github.com/sp00nznet/xboxrecomp/pull/229)) | the real-title conformance harness builds on this game and no longer overruns on wide strings |
 | `fix/disasm-tables-in-code-sections` ([#227](https://github.com/sp00nznet/xboxrecomp/pull/227)) | function-pointer tables inside XDK code sections (D3D's render-state handlers) |
 | `fix/io-apc-delivery` ([#226](https://github.com/sp00nznet/xboxrecomp/pull/226)) | file I/O APC: restore esp after delivery; opt-in delivery at the next alertable wait |
 | `perf/raster-batch-rows` ([#228](https://github.com/sp00nznet/xboxrecomp/pull/228)) | rasterise a draw's triangles together on the worker pool: 5.5 → 15 fps in Carbon |

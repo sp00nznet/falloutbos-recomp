@@ -24,8 +24,17 @@ function Fail($m) { Write-Host ""; Write-Host "Setup stopped: $m" -ForegroundCol
 function Ask($q)  { (Read-Host "$q [y/N]") -match '^[Yy]' }
 function Run($what, [scriptblock]$cmd) {
     Say "--> $what"
-    & $cmd *>> $Log
-    if ($LASTEXITCODE -ne 0) { Fail "$what failed." }
+    # Windows PowerShell turns a native program's stderr into an error record
+    # once it is redirected, and under 'Stop' that ends the script -- on git's
+    # "Cloning into ..." progress line. The exit code is the real verdict.
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $global:LASTEXITCODE = 0
+    # Out-File, not >>: Windows PowerShell's >> appends UTF-16 to this UTF-8 log.
+    & $cmd 2>&1 | ForEach-Object { "$_" } | Out-File $Log -Append -Encoding utf8
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    if ($code -ne 0) { Fail "$what failed." }
 }
 function Have($exe) { [bool](Get-Command $exe -ErrorAction SilentlyContinue) }
 function Install($id, $why, $size) {

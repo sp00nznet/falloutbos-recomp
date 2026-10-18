@@ -24,6 +24,13 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
   It found the 5 fps: the pushbuffer executor rasterised every small triangle
   itself while the worker pool slept (fixed in xboxrecomp #228, 15 fps).
 
+- Quick start: `Setup.cmd` (prerequisites, asks before installing, disc,
+  regen, build) and `Play.cmd` (window, pad or keyboard).
+- `tools/boot_check.py`: boot conformance, 8 milestones logo-to-Carbon, against
+  a baseline; netlab QA step.
+- Dialogue text confirmed drawing in Carbon (the empty box earlier was a
+  capture mid fade-in).
+
 ### Fixed
 - `regen.sh` resolves `TRACE_FUNCS` to an absolute path; the toolkit runs from
   its own directory and could not find a relative one.

@@ -1,9 +1,16 @@
 # Roadmap
 
 ## Next
-- Speed in the level: ~15 fps after #228. The title's thread still spends its
-  time waiting for the executor in D3D's kickoff; next is the executor's own
-  per-batch work (vertex programs, combiner setup), or a hardware back end.
+- Speed in the level: ~17 fps with #231; the executor is 25% busy and the
+  raster workers about 60%. Left on the table:
+  - Workers stall at every scan end (drain before DMA_GET). A drain only at
+    fences and reports would need the 0x400B10 latch modelled in the default
+    segment scan: removing KickOff's flush wait (tried, reverted) let the
+    title run ahead into `sub_000AB760`, which waits on that latch for ever.
+  - The pixel loop itself (combiners per pixel, no SIMD), or a hardware
+    back end.
+  - On a busy host the NV2A polling thread's `Sleep(0)` loses its core, and
+    every kickoff waits a time slice; fps then halves.
 - A camera fault seen once in Carbon (docs/images/known-camera-wedge.png): a
   giant wedge fills the screen while the minimap is unchanged. Not reproduced
   since; catch it with a frame trace.

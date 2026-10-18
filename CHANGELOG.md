@@ -23,6 +23,10 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
 - `FBOS_PROFILE=<start>,<secs>`: a sampling profiler in `main.c`, per thread.
   It found the 5 fps: the pushbuffer executor rasterised every small triangle
   itself while the worker pool slept (fixed in xboxrecomp #228, 15 fps).
+- Carbon at ~17 fps on the toolkit branch `work/falloutbos`, which now also
+  carries xboxrecomp #230 (no per-kick trace line) and #231 (rasteriser
+  pipelined behind the executor).
+- README: `RECOMP_RASTER_THREADS` and what it does on a 12-thread CPU.
 
 - Quick start: `Setup.cmd` (prerequisites, asks before installing, disc,
   regen, build) and `Play.cmd` (window, pad or keyboard).
@@ -30,6 +34,10 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
   a baseline; netlab QA step.
 - Dialogue text confirmed drawing in Carbon (the empty box earlier was a
   capture mid fade-in).
+
+### Changed
+- The profiler samples about 35 times faster (raw addresses, named at the
+  end; thread list refreshed once a second).
 
 ### Fixed
 - `regen.sh` resolves `TRACE_FUNCS` to an absolute path; the toolkit runs from

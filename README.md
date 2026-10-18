@@ -21,8 +21,9 @@ difficulty select, chapter 1's intro, and into the first level, Carbon, with
 Nadia on screen, the HUD up and the world textured. 0 faults and 0 unresolved
 indirect calls in a 270 s scripted run.
 
-Not yet good: the software rasteriser runs the level at about 15 fps (5 before
-xboxrecomp [#228](https://github.com/sp00nznet/xboxrecomp/pull/228)), the Bink
+Not yet good: the software rasteriser runs the level at about 17 fps (5 before
+xboxrecomp [#228](https://github.com/sp00nznet/xboxrecomp/pull/228), 15 after
+it, 17 with [#231](https://github.com/sp00nznet/xboxrecomp/pull/231)), the Bink
 videos show scattered block artifacts, and no one has played past the opening
 dialogue yet.
 
@@ -46,7 +47,7 @@ pushbuffer drew into. The level shot was reached headless with a scripted pad.*
 | Main menu | done |
 | Controller | done: the title's own USB stack enumerates the modelled pad |
 | Menus to gameplay | done: character select, difficulty, chapter intro, Carbon |
-| Gameplay | renders at ~5 fps; not played past the opening |
+| Gameplay | renders at ~17 fps; not played past the opening |
 
 What it took, and why, is in [docs/boot.md](docs/boot.md).
 
@@ -148,6 +149,7 @@ install. After installing anything, open a new terminal so PATH picks it up.
 | `RECOMP_KEYBOARD=1` | keyboard as player 1 (see Getting Started) |
 | `RECOMP_PAD_SCRIPT="ms:button,..."` | scripted presses for headless runs, e.g. `25000:start,35000:a` |
 | `RECOMP_USB_STATS=1` | controller transfer counts every few seconds |
+| `RECOMP_RASTER_THREADS=N` | rasteriser worker threads (default: logical cores - 4). On a 6-core/12-thread CPU, 10 gave about 19 fps against 17; 12 starves the game and drops to 9 |
 | `FBOS_PROFILE=<start>,<secs>` | sample every thread for `<secs>` seconds starting at `<start>`, print the top functions per thread |
 
 `RECOMP_AC97_READY` and `RECOMP_USB` are set by `main.c` itself: the title
@@ -190,6 +192,8 @@ Found by this port, each on its own branch in xboxrecomp:
 | `fix/disasm-tables-in-code-sections` ([#227](https://github.com/sp00nznet/xboxrecomp/pull/227)) | function-pointer tables inside XDK code sections (D3D's render-state handlers) |
 | `fix/io-apc-delivery` ([#226](https://github.com/sp00nznet/xboxrecomp/pull/226)) | file I/O APC: restore esp after delivery; opt-in delivery at the next alertable wait |
 | `perf/raster-batch-rows` ([#228](https://github.com/sp00nznet/xboxrecomp/pull/228)) | rasterise a draw's triangles together on the worker pool: 5.5 → 15 fps in Carbon |
+| `perf/nv2a-quiet-poll` ([#230](https://github.com/sp00nznet/xboxrecomp/pull/230)) | no stderr line per pushbuffer kick under `RECOMP_PB_EXEC`: menus 20-22 → 25-28 fps |
+| `perf/raster-pipeline` ([#231](https://github.com/sp00nznet/xboxrecomp/pull/231), on #228) | batches drawn by the workers while the executor decodes the next: 15.5 → 17.4 fps in Carbon |
 | community PR #186 | `pushfd`/`popfd`/`cpuid` lifted as the hardware does them. Until it lands, `recomp_manual.c` overrides the one function that needs it |
 
 ## License

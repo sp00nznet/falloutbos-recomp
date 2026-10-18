@@ -15,16 +15,22 @@ derived from your own disc and is never distributed; you produce it locally.
 
 ## Status
 
-**v0.1.0-dev, alpha.** It boots to its own main menu with no arguments and
-nothing forced: the Interplay logo, the intro FMV, then the menu over its
-animated `Main_Menu.bik` background. 0 faults and 0 unresolved indirect calls
-in a 150 s run. It is not playable: nothing is wired to a controller yet, and
-the Bink videos show scattered block artifacts.
+**v0.1.0-dev, alpha.** It boots with no arguments and nothing forced, and the
+modelled Xbox controller drives it: through the main menu, character and
+difficulty select, chapter 1's intro, and into the first level, Carbon, with
+Nadia on screen, the HUD up and the world textured. 0 faults and 0 unresolved
+indirect calls in a 270 s scripted run.
 
-![Fallout: Brotherhood of Steel (Xbox) recompiled, at its main menu](docs/images/main-menu.png)
+Not yet good: the software rasteriser runs the level at about 5 fps, the Bink
+videos show scattered block artifacts, and no one has played past the opening
+dialogue yet.
 
-*`fbos.exe` with `RECOMP_PB_EXEC=1`, 640x480, captured from the surface the
-title's own pushbuffer drew into.*
+![Fallout: Brotherhood of Steel (Xbox) recompiled, in Carbon](docs/images/carbon.png)
+
+![The main menu](docs/images/main-menu.png) ![Difficulty select](docs/images/difficulty.png)
+
+*`fbos.exe` with `RECOMP_PB_EXEC=1`, captured from the surface the title's own
+pushbuffer drew into. The level shot was reached headless with a scripted pad.*
 
 | Step | State |
 |---|---|
@@ -36,9 +42,10 @@ title's own pushbuffer drew into.*
 | DirectSound / APU | done: the title starts the APU itself, streams create |
 | Async file streaming | done: needs deferred I/O APCs (see [docs/boot.md](docs/boot.md)) |
 | Bink FMV | plays: Interplay logo, intro; block artifacts in motion |
-| Main menu | **done** |
-| Controller | not yet |
-| Gameplay | not yet |
+| Main menu | done |
+| Controller | done: the title's own USB stack enumerates the modelled pad |
+| Menus to gameplay | done: character select, difficulty, chapter intro, Carbon |
+| Gameplay | renders at ~5 fps; not played past the opening |
 
 What it took, and why, is in [docs/boot.md](docs/boot.md).
 
@@ -108,6 +115,11 @@ What it took, and why, is in [docs/boot.md](docs/boot.md).
    RECOMP_PB_EXEC=1 RECOMP_FB_WINDOW=1 ./bin/fbos.exe
    ```
 
+   An XInput controller (Xbox 360/One pad) plugged into the PC is player 1.
+   Without one, add `RECOMP_KEYBOARD=1`: WASD left stick, IJKL right stick,
+   Z/X/C/V = A/B/X/Y, Enter = Start, Backspace = Back, 1/3 = triggers. Keys are
+   read from the game window while it has focus.
+
 ## Usage
 
 | Variable | Effect |
@@ -118,9 +130,21 @@ What it took, and why, is in [docs/boot.md](docs/boot.md).
 | `RECOMP_FB_DUMP_FLIPS=<file>` | dump every flip while `<file>` exists |
 | `RECOMP_WATCHDOG_SECS=N` | after N seconds, report where the guest is |
 | `RECOMP_KERNEL_LOG_BUDGET=N` | log the first N kernel calls (default 200) |
+| `RECOMP_KEYBOARD=1` | keyboard as player 1 (see Getting Started) |
+| `RECOMP_PAD_SCRIPT="ms:button,..."` | scripted presses for headless runs, e.g. `25000:start,35000:a` |
+| `RECOMP_USB_STATS=1` | controller transfer counts every few seconds |
 
-`RECOMP_AC97_READY` is set by `main.c` itself: the title cannot initialise
-DirectSound without it.
+`RECOMP_AC97_READY` and `RECOMP_USB` are set by `main.c` itself: the title
+cannot initialise DirectSound without the first, or see a controller without
+the second.
+
+From power-on to Carbon, headless:
+
+```bash
+S="25000:start,35000:a,50000:a,65000:a"
+for t in $(seq 80000 5000 250000); do S="$S,$t:a"; done
+RECOMP_PAD_SCRIPT="$S" RECOMP_PB_EXEC=1 RECOMP_FB_DUMP=shot ./bin/fbos.exe
+```
 
 Headless capture, no window, works over RDP:
 
@@ -147,7 +171,7 @@ Found by this port, each on its own branch in xboxrecomp:
 | Branch | What |
 |---|---|
 | `fix/disasm-tables-in-code-sections` | function-pointer tables inside XDK code sections (D3D's render-state handlers) |
-| `fix/io-apc-delivery` | file I/O APC: restore esp after delivery; opt-in delivery at the next alertable wait |
+| `fix/io-apc-delivery` ([#226](https://github.com/sp00nznet/xboxrecomp/pull/226)) | file I/O APC: restore esp after delivery; opt-in delivery at the next alertable wait |
 | community PR #186 | `pushfd`/`popfd`/`cpuid` lifted as the hardware does them. Until it lands, `recomp_manual.c` overrides the one function that needs it |
 
 ## License

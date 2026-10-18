@@ -240,6 +240,10 @@ int main(int argc, char **argv)
      * The layout reads this at init (presence only), so set it first. */
     if (!getenv("RECOMP_AC97_READY"))
         _putenv_s("RECOMP_AC97_READY", "1");
+    /* The modelled OHCI controller and pad, so the menus can be driven. A
+     * host XInput pad drives it; RECOMP_PAD_SCRIPT drives it headless. */
+    if (!getenv("RECOMP_USB"))
+        _putenv_s("RECOMP_USB", "1");
 
     /* .data is 5.4 MB virtual against 62 KB raw: the engine keeps its big
      * pools as zero-fill statics rather than heap. The default 64 MB map
@@ -254,6 +258,21 @@ int main(int argc, char **argv)
     g_xbox_mem_offset = xbox_GetMemoryOffset();
     printf("Xbox memory mapped at host offset 0x%llX\n",
            (unsigned long long)g_xbox_mem_offset);
+
+    /* Keep contiguous memory off the physical pages the image occupies.
+     *
+     * Device models get physical addresses, and here physical P is either
+     * a contiguous buffer (window 0x80000000 + P) or the image itself,
+     * which is separate storage. The real kernel never hands out contiguous
+     * memory overlapping the image, so the models assume an address inside
+     * the image IS the image. This image is 6.4 MB, and the allocator fills
+     * from page 1 upward, so the USB driver's control ED landed at physical
+     * 0x00102940 -- inside .data -- and the OHCI model read it as zeros:
+     * the pad connected, reset, and was never asked for a descriptor.
+     * Claiming the aliasing pages now, before anything allocates, moves every
+     * contiguous allocation above the image. */
+    xbox_ContiguousClaim(XBOX_CONTIG_BASE + g_xbox_image_lo,
+                         g_xbox_image_hi - g_xbox_image_lo);
 
     /* The APU reads physical RAM, which is mapped at g_xbox_mem_offset. */
     {

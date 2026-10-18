@@ -16,6 +16,10 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
 - Native override of Bink's MMX probe `sub_000A4E60` (until xboxrecomp #186).
 - Seeds: `0x00095408` (main thread entry), `0x000D845C` (XPP table entry).
 - `docs/boot.md`: each wall on the way to the menu and how it was found.
+- Controller: `RECOMP_USB` on by default, and the window pages that alias the
+  image are claimed so the OHCI model resolves the driver's descriptors. The
+  pad enumerates; scripted presses reach the first level, Carbon.
+- Seed `0x0002F110` (a virtual method reached in Carbon).
 
 ### Fixed
 - `regen.sh` resolves `TRACE_FUNCS` to an absolute path; the toolkit runs from

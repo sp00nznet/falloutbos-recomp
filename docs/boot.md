@@ -118,8 +118,42 @@ MMX. Note the flag sense: the caller's `0x40000` turns MMX **off**; the
 original falls through to the clear only when that bit is set. The toolkit fix
 is community PR #186; delete the override once a toolkit with it is pinned.
 
+## 7. The controller: contiguous memory on top of the image
+
+With `RECOMP_USB=1` the OHCI model comes up and the title's ISR claims its
+interrupts, but `RECOMP_USB_STATS` showed **0 setup packets**. The register
+trace (`RECOMP_USB_TRACE=1`) has the driver seeing the connect on port 1
+(`HcRhPortStatus = 00010101`), resetting the port (`00100103`), pointing
+`HcControlHeadED` at `0x00102940` and setting ControlListFilled, and the model
+reading that ED as all zeros, for ever.
+
+`0x00102940` is a physical address. The driver built the ED in contiguous
+memory, and in this runtime the contiguous window is separate storage, so the
+model has to guess what a physical address names: a contiguous buffer or the
+loaded image. It assumes the image whenever the address falls inside it, since
+a real kernel never hands out contiguous memory there. This image runs from
+`0x10000` to `0x675AB8`; the allocator fills from page 1 up, so the ED sat
+inside `.data` as far as the model could tell. Burnout 3, where the model was
+proven, has a small image and never overlapped.
+
+`main.c` claims the window pages that alias the image
+(`xbox_ContiguousClaim(XBOX_CONTIG_BASE + g_xbox_image_lo, ...)`) before
+anything allocates. After it: 8 setups, the pad configured, its interrupt-IN
+endpoint polled ~140 times a second, and `RECOMP_PAD_SCRIPT` presses reach the
+menus. Doing the same inside the toolkit for every title would be the faithful
+fix, but it moves every contiguous allocation of a big-image title such as
+Half-Life 2, so it is a separate change.
+
+## 8. A virtual method only a vtable names
+
+In Carbon, `[ICALL] Failed to resolve VA 0x0002F110`, repeating. It is a C++
+method after int3 padding that forwards through `jmp [eax+0x24]`; the table
+pass requires a closed body and rejects an indirect tail. Seeded.
+
 ## Known issues
 
 - Bink frames show scattered 8x8 block artifacts, in the intro and in the menu
   background. The decode is in recompiled MMX code.
-- No controller input.
+- The level runs at about 5 fps in the software pushbuffer executor.
+- The opening dialogue box was captured empty once; it may have been mid
+  fade-in (the difficulty labels were, in another capture). Unverified.

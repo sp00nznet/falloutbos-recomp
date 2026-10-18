@@ -1,8 +1,10 @@
 # Roadmap
 
 ## Next
-- Controller input: bring up the USB/XID path the title's XAPI expects, so the
-  menu can be driven. hl2-recomp `docs/input.md` is where that stands.
+- Speed in the level: ~5 fps in the software rasteriser. Profile pb_exec on
+  Carbon before anything else gameplay-related.
+- Play past the opening dialogue with a real pad; confirm dialogue text draws.
+- Upstream the image-aliasing claim into xboxrecomp's contiguous allocator.
 - Bink block artifacts: find the recompiled MMX routine that decodes them
   wrong (compare one frame against xemu as a black box).
 - Get the three toolkit changes merged and pin the toolkit version; then delete

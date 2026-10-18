@@ -1,0 +1,22 @@
+# Changelog
+
+All notable changes to this project are documented here. Format: [Keep a
+Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
+
+## [Unreleased]
+
+### Added
+- Project from the xboxrecomp new-game template and the Half-Life 2 port's
+  layout: `regen.sh`, CMake, `main.c`, netlab recipe `falloutbos-recomp`.
+- Boots to the main menu with no arguments: Interplay logo, intro FMV, menu
+  over `Main_Menu.bik`. 0 faults, 0 unresolved indirect calls in 150 s.
+- GPU fence mirror for the D3D device at `0x000B5E58`.
+- `RECOMP_AC97_READY` on by default, so DirectSound initialises.
+- Deferred file I/O APCs turned on (needs xboxrecomp `fix/io-apc-delivery`).
+- Native override of Bink's MMX probe `sub_000A4E60` (until xboxrecomp #186).
+- Seeds: `0x00095408` (main thread entry), `0x000D845C` (XPP table entry).
+- `docs/boot.md`: each wall on the way to the menu and how it was found.
+
+### Fixed
+- `regen.sh` resolves `TRACE_FUNCS` to an absolute path; the toolkit runs from
+  its own directory and could not find a relative one.

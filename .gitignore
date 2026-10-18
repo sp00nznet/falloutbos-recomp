@@ -1,0 +1,32 @@
+# Game files (never committed: REPO_RULES section 3)
+*.iso
+*.xbe
+*.7z
+*.bik
+/game/
+
+# Generated C, derived from the retail XBE. Regenerate locally with
+# ./regen.sh; the tool ships, the output never does.
+src/game/recomp/gen/
+
+# Pipeline output and build trees
+build/
+build-*/
+bin/
+*.obj
+*.lib
+*.exe
+*.pdb
+*.ilk
+*.map
+
+# Runtime output: HDD partition images, saves, logs, frame and texture dumps
+saves/
+*.log
+*.bmp
+*.mp4
+icall_targets.dump
+scratch/
+
+__pycache__/
+*.pyc

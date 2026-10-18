@@ -46,6 +46,8 @@ target_link_libraries(fbos PRIVATE
     kernel32
     user32
     gdi32
+    # timeBeginPeriod, for the profiler's 2 ms sample interval.
+    winmm
     # Resolves the host address in a fault report back to the generated
     # function's symbol, i.e. to the guest function that faulted.
     dbghelp

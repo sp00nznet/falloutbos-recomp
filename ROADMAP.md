@@ -1,8 +1,9 @@
 # Roadmap
 
 ## Next
-- Speed in the level: ~5 fps in the software rasteriser. Profile pb_exec on
-  Carbon before anything else gameplay-related.
+- Speed in the level: ~15 fps after #228. The title's thread still spends its
+  time waiting for the executor in D3D's kickoff; next is the executor's own
+  per-batch work (vertex programs, combiner setup), or a hardware back end.
 - Play past the opening dialogue with a real pad; confirm dialogue text draws.
 - Upstream the image-aliasing claim into xboxrecomp's contiguous allocator.
 - Bink block artifacts: find the recompiled MMX routine that decodes them

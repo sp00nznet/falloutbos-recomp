@@ -20,6 +20,9 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
   image are claimed so the OHCI model resolves the driver's descriptors. The
   pad enumerates; scripted presses reach the first level, Carbon.
 - Seed `0x0002F110` (a virtual method reached in Carbon).
+- `FBOS_PROFILE=<start>,<secs>`: a sampling profiler in `main.c`, per thread.
+  It found the 5 fps: the pushbuffer executor rasterised every small triangle
+  itself while the worker pool slept (fixed in xboxrecomp #228, 15 fps).
 
 ### Fixed
 - `regen.sh` resolves `TRACE_FUNCS` to an absolute path; the toolkit runs from

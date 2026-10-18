@@ -21,7 +21,8 @@ difficulty select, chapter 1's intro, and into the first level, Carbon, with
 Nadia on screen, the HUD up and the world textured. 0 faults and 0 unresolved
 indirect calls in a 270 s scripted run.
 
-Not yet good: the software rasteriser runs the level at about 5 fps, the Bink
+Not yet good: the software rasteriser runs the level at about 15 fps (5 before
+xboxrecomp [#228](https://github.com/sp00nznet/xboxrecomp/pull/228)), the Bink
 videos show scattered block artifacts, and no one has played past the opening
 dialogue yet.
 
@@ -133,6 +134,7 @@ What it took, and why, is in [docs/boot.md](docs/boot.md).
 | `RECOMP_KEYBOARD=1` | keyboard as player 1 (see Getting Started) |
 | `RECOMP_PAD_SCRIPT="ms:button,..."` | scripted presses for headless runs, e.g. `25000:start,35000:a` |
 | `RECOMP_USB_STATS=1` | controller transfer counts every few seconds |
+| `FBOS_PROFILE=<start>,<secs>` | sample every thread for `<secs>` seconds starting at `<start>`, print the top functions per thread |
 
 `RECOMP_AC97_READY` and `RECOMP_USB` are set by `main.c` itself: the title
 cannot initialise DirectSound without the first, or see a controller without
@@ -172,6 +174,7 @@ Found by this port, each on its own branch in xboxrecomp:
 |---|---|
 | `fix/disasm-tables-in-code-sections` ([#227](https://github.com/sp00nznet/xboxrecomp/pull/227)) | function-pointer tables inside XDK code sections (D3D's render-state handlers) |
 | `fix/io-apc-delivery` ([#226](https://github.com/sp00nznet/xboxrecomp/pull/226)) | file I/O APC: restore esp after delivery; opt-in delivery at the next alertable wait |
+| `perf/raster-batch-rows` ([#228](https://github.com/sp00nznet/xboxrecomp/pull/228)) | rasterise a draw's triangles together on the worker pool: 5.5 → 15 fps in Carbon |
 | community PR #186 | `pushfd`/`popfd`/`cpuid` lifted as the hardware does them. Until it lands, `recomp_manual.c` overrides the one function that needs it |
 
 ## License

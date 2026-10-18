@@ -144,6 +144,114 @@ static void print_guest_stack(void)
         fprintf(stderr, "    (no return addresses in range)\n");
 }
 
+/* Sampling profiler: FBOS_PROFILE=<start secs>,<duration secs>.
+ *
+ * Every 2 ms, suspend each other thread, read its RIP, name it through the
+ * PDB, count. At the end print the top functions, which says whether a slow
+ * frame is the lifted game, the pushbuffer executor or the rasteriser.
+ * ponytail: a fixed 2048-name table and a linear search; enough for "where
+ * does the time go", not a real profiler. */
+#include <tlhelp32.h>
+
+typedef struct { char name[112]; unsigned n; } prof_ent;
+static prof_ent g_prof[2048];
+static unsigned g_prof_used, g_prof_total;
+
+static void prof_count(DWORD tid, DWORD64 rip)
+{
+    char buf[sizeof(SYMBOL_INFO) + 96];
+    SYMBOL_INFO *sym = (SYMBOL_INFO *)buf;
+    DWORD64 disp = 0;
+    const char *name = buf + sizeof(SYMBOL_INFO);   /* fallback text */
+    unsigned i;
+
+    memset(buf, 0, sizeof(buf));
+    sym->SizeOfStruct = sizeof(SYMBOL_INFO);
+    sym->MaxNameLen = 95;
+    if (SymFromAddr(GetCurrentProcess(), rip, &disp, sym))
+        name = sym->Name;
+    else {
+        /* No symbol: name the module, so system DLLs still group. */
+        HMODULE mod = NULL;
+        char path[MAX_PATH] = "?";
+        GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                           GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           (LPCSTR)(uintptr_t)rip, &mod);
+        if (mod)
+            GetModuleFileNameA(mod, path, sizeof(path));
+        snprintf((char *)name, 64, "<%s>",
+                 strrchr(path, '\\') ? strrchr(path, '\\') + 1 : path);
+    }
+    {
+        /* Keyed by thread too: which thread waits on what is the question. */
+        static char key[112];
+        snprintf(key, sizeof(key), "%5lu %s", (unsigned long)tid, name);
+        name = key;
+    }
+    g_prof_total++;
+    for (i = 0; i < g_prof_used; i++)
+        if (!strcmp(g_prof[i].name, name)) { g_prof[i].n++; return; }
+    if (g_prof_used < 2048) {
+        strncpy(g_prof[g_prof_used].name, name, 111);
+        g_prof[g_prof_used++].n = 1;
+    }
+}
+
+static int prof_cmp(const void *a, const void *b)
+{
+    return (int)((const prof_ent *)b)->n - (int)((const prof_ent *)a)->n;
+}
+
+static DWORD WINAPI profiler(LPVOID arg)
+{
+    const char *spec = (const char *)arg;
+    unsigned start = (unsigned)atoi(spec), secs = 10, i;
+    const char *comma = strchr(spec, ',');
+    DWORD me = GetCurrentThreadId(), pid = GetCurrentProcessId(), t0;
+
+    if (comma) secs = (unsigned)atoi(comma + 1);
+    Sleep(start * 1000u);
+    fprintf(stderr, "[PROF] sampling for %us\n", secs);
+    timeBeginPeriod(1);
+    t0 = GetTickCount();
+    while (GetTickCount() - t0 < secs * 1000u) {
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        THREADENTRY32 te;
+        te.dwSize = sizeof(te);
+        if (snap != INVALID_HANDLE_VALUE && Thread32First(snap, &te)) {
+            do {
+                HANDLE th;
+                /* x64 GetThreadContext fails on a CONTEXT that is not
+                 * 16-byte aligned, and a stack local is not guaranteed to be. */
+                __declspec(align(16)) CONTEXT ctx;
+                if (te.th32OwnerProcessID != pid || te.th32ThreadID == me)
+                    continue;
+                th = OpenThread(THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME,
+                                FALSE, te.th32ThreadID);
+                if (!th)
+                    continue;
+                ctx.ContextFlags = CONTEXT_CONTROL;
+                if (SuspendThread(th) != (DWORD)-1) {
+                    if (GetThreadContext(th, &ctx))
+                        prof_count(te.th32ThreadID, ctx.Rip);
+                    ResumeThread(th);
+                }
+                CloseHandle(th);
+            } while (Thread32Next(snap, &te));
+        }
+        if (snap != INVALID_HANDLE_VALUE)
+            CloseHandle(snap);
+        Sleep(2);
+    }
+    qsort(g_prof, g_prof_used, sizeof(g_prof[0]), prof_cmp);
+    fprintf(stderr, "[PROF] %u samples, top functions:\n", g_prof_total);
+    for (i = 0; i < g_prof_used && i < 60; i++)
+        fprintf(stderr, "[PROF] %5.1f%%  %6u  %s\n",
+                100.0 * g_prof[i].n / g_prof_total, g_prof[i].n, g_prof[i].name);
+    fflush(stderr);
+    return 0;
+}
+
 static LONG CALLBACK veh_handler(PEXCEPTION_POINTERS ep)
 {
     static unsigned fault_reports, others;
@@ -223,6 +331,9 @@ int main(int argc, char **argv)
         SymInitialize(GetCurrentProcess(), n ? dir : NULL, TRUE);
     }
     AddVectoredExceptionHandler(1, veh_handler);
+    if (getenv("FBOS_PROFILE"))
+        CloseHandle(CreateThread(NULL, 0, profiler,
+                                 (LPVOID)getenv("FBOS_PROFILE"), 0, NULL));
 
     if (!recomp_dispatch_init())
         fprintf(stderr, "[BOOT] flat dispatch unavailable; "

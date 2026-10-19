@@ -1,5 +1,11 @@
 # falloutbos-recomp
 
+![Fallout: Brotherhood of Steel recompiled: the main menu, then Nadia in Carbon](docs/images/hero.gif)
+
+*Recorded headless from `fbos.exe`: the scripted pad from `tools/boot_check.py`,
+then the left stick and fire. Every presented frame, played back at the 10 fps
+it ran at while dumping them (about 17 fps without the dumps).*
+
 Static recompilation of **Fallout: Brotherhood of Steel (Xbox, 2004)** to a
 native Windows executable, using [xboxrecomp](https://github.com/sp00nznet/xboxrecomp).
 
